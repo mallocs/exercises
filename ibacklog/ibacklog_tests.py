@@ -1,8 +1,10 @@
+"""
+Tests for IBacklog interface: Add, Remove, and getSprint
+"""
 
 import unittest
-import sqlite3
 import os
-from ibacklog import IBacklog, Story, SQLLiteDatastore, StoryNotFoundError, IDatastore
+from ibacklog import IBacklog, Story, StoryNotFoundError, IDatastore
 from unittest.mock import Mock
 
 class TestIBacklogFunctions(unittest.TestCase):
