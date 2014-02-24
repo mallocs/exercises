@@ -1,5 +1,5 @@
 """
-A coding excercise python3 module for managing Story objects with an IBacklog interface.
+A coding exercise python3 module for managing Story objects with an IBacklog interface.
 """
 
 import sqlite3
