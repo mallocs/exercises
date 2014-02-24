@@ -54,11 +54,12 @@ class SQLLiteDatastore(IDatastore):
         stories_tuple_list = self.cur.fetchall()
         if len(stories_tuple_list) == 1:
             self._execute('''DELETE FROM ''' + DB_TABLE_NAME + ''' WHERE Id=?''', False, (Id,))
+            story = self._makeStoryFromTuple(stories_tuple_list[0])
         else:
-            raise StoryNotFoundError("Story was not found in the datastore")
+            story = None
         self.conn.commit()
         self.cur.close()
-        return self._makeStoryFromTuple(stories_tuple_list[0])
+        return story
 
 
 class IBacklog:
@@ -74,6 +75,8 @@ class IBacklog:
 
     def Remove(self, Id):
         story = self.datastore.deleteStory(Id)
+        if not story:
+            raise StoryNotFoundError("Story was not found in the datastore")
         return story
 
     def getSprint(self, totalPointsAchievable):
