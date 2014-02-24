@@ -1,7 +1,7 @@
 
 import sqlite3
 
-SQLITE_DB_FILE = 'ibacklog.db'
+SQLITE_DB_FILENAME = 'ibacklog.db'
 DB_TABLE_NAME = 'Stories'
 
 
@@ -21,9 +21,9 @@ class IDatastore():
 
 
 class SQLLiteDatastore(IDatastore):
-    def __init__(self):
+    def __init__(self, db_filename=SQLITE_DB_FILENAME):
         IDatastore.__init__(self)
-        self.conn = sqlite3.connect(SQLITE_DB_FILE)
+        self.conn = sqlite3.connect(db_filename)
         self._execute('''CREATE TABLE IF NOT EXISTS ''' + DB_TABLE_NAME + '''(Id TEXT, Points INTEGER, Priority INTEGER)''')
 
     def _execute(self, sql_cmd, close=True, bindings=None):
@@ -79,8 +79,7 @@ class IBacklog:
     def getSprint(self, totalPointsAchievable):
         totalPointsAchievable = int(totalPointsAchievable)
         storylist = self.datastore.readStory()
-        storylist = sorted(storylist, key=lambda story: story.Points, reverse=True)
-        storylist = sorted(storylist, key=lambda story: story.Priority)
+        storylist.sort(key = lambda story: (story.Priority, -story.Points))
         points = 0
         sprintlist = []
         for story in storylist:
@@ -105,6 +104,7 @@ class Story:
 
 #Add: Should call createStory once.
 #Remove: Should call deleteStory once and return 1 story. 
+#
 #getSprint: Should return a list of stories. Test various input numbers given different story lists.
 
 #Setup DB fixture
