@@ -5,75 +5,98 @@ import os
 from ibacklog import IBacklog, Story, SQLLiteDatastore, StoryNotFoundError, IDatastore
 from unittest.mock import Mock
 
-TEST_SQLITE_DB_FILENAME = '_test_ibacklog.db'
-TEST_DB1_FILENAME = 'test1.sql'
 class TestIBacklogFunctions(unittest.TestCase):
 
-    def setUp(self):
-        if os.path.isfile(TEST_SQLITE_DB_FILENAME):
-            raise RuntimeError("Could not create a new " + TEST_SQLITE_DB_FILENAME + ". File already exists.")
-        self.backlog = IBacklog(SQLLiteDatastore(TEST_SQLITE_DB_FILENAME))
-        
     def test_Add(self):
-
+        # Make sure datastore.createStory is called once when IBacklog.Add is called.
         story1 = Story("1", 3, 1)
         datastore_mock = Mock()
         datastore_mock.__class__ = IDatastore
         datastore_mock.createStory(story1)
         datastore_mock.createStory.assert_called_once_with(story1)
         backlog = IBacklog(datastore_mock)
-
-        # make sure one Story is added to the datastore when the datastore is empty.
-
-        countBeforeAdd = len(self.backlog.datastore.readStory())
-        self.backlog.Add(story1)
-        self.assertEqual(countBeforeAdd+1, len(self.backlog.datastore.readStory()))
-
-        # make sure one Story is added to the datastore when the datastore is not empty.
-        story2 = Story("2", 6, 2)
-        self.backlog.Add(story2)
-        self.assertEqual(countBeforeAdd+2, len(self.backlog.datastore.readStory()))
+        backlog.Add(story1)
 
     def test_Remove(self):
-        # make sure one story is removed if it is in the datastore.
-        # make sure the story is returned.
+        # Make sure datastore.deleteStory is called once when IBacklog.Remove is called.
+        # Make sure the story is returned.
         
-        self._setStoryTableStateWithSQLFile(TEST_DB1_FILENAME)
         story1 = Story("1", 3, 1)
         datastore_mock = Mock()
         datastore_mock.__class__ = IDatastore
-        datastore_mock.removeStory.return_value = story1
-        datastore_mock.removeStory("1")
-        datastore_mock.removeStory.assert_called_once_with("1")
+        datastore_mock.deleteStory.return_value = story1
+        datastore_mock.deleteStory("1")
+        datastore_mock.deleteStory.assert_called_once_with("1")
+        backlog = IBacklog(datastore_mock)
+        actual_story = backlog.Remove("1")
+        self.assertEqual(actual_story, story1)
 
+    def test_RemoveRaisesException(self):
+        # Make sure an exception is raised IBacklog.Remove is called with the Id of a story
+        # that is not in the datastore.
+        datastore_mock = Mock()
+        datastore_mock.__class__ = IDatastore
+        datastore_mock.deleteStory.return_value = None
+        datastore_mock.deleteStory("1")
+        datastore_mock.deleteStory.assert_called_once_with("1")
+        backlog = IBacklog(datastore_mock)
+        self.assertRaises(StoryNotFoundError, backlog.Remove, "1")
 
-        self._setStoryTableStateWithSQLFile(TEST_DB1_FILENAME)
-        countBeforeRemove = len(self.backlog.datastore.readStory())
-        story = self.backlog.Remove("1")
-        self.assertEqual(countBeforeRemove-1, len(self.backlog.datastore.readStory()))
-        
-        # make sure an error is raised if it is not in the datastore.
-        self.assertRaises(StoryNotFoundError, self.backlog.Remove, "1")
+    def _getFakeStoryList1(self):
+        # Total points of all stories is 45.
+        self.story1 = story1 = Story("1", 3, 1)
+        self.story2 = story2 = Story("2", 13, 1)
+        self.story3 = story3 = Story("3", 1, 3)
+        self.story4 = story4 = Story("4", 3, 10)
+        self.story5 = story5 = Story("5", 20, 3)
+        self.story6 = story6 = Story("6", 5, 3)
+        return [story1, story2, story3, story4, story5, story6]
 
-    def test_getSprint(self):
-        self._setStoryTableStateWithSQLFile(TEST_DB1_FILENAME)
+    def test_getSprintNegativeInput(self):
+        # Make sure IBacklog.getSprint returns [] for negative totalPointsAchievable input.
+        storylist = self._getFakeStoryList1()
+        datastore_mock = Mock()
+        datastore_mock.__class__ = IDatastore
+        datastore_mock.readStory.return_value = storylist
+        backlog = IBacklog(datastore_mock)
+        actual_storylist = backlog.getSprint(-1)
+        self.assertEqual(actual_storylist, [])
+  
+    def test_getSprintExpectAllStories(self):
+        # Make sure IBacklog.getSprint returns all the stories when totalPointsAchievable input
+        # is greater than the total points of all the stories.
+        storylist = self._getFakeStoryList1()
+        datastore_mock = Mock()
+        datastore_mock.__class__ = IDatastore
+        datastore_mock.readStory.return_value = storylist
+        backlog = IBacklog(datastore_mock)
+        actual_storylist= backlog.getSprint(46)
+        self.assertEqual(storylist, actual_storylist)
 
-    def tearDown(self):
-        os.remove(TEST_SQLITE_DB_FILENAME)
+    def test_getSprintAllPointsTooHigh(self):
+        # Make sure IBacklog.getSprint returns [] when all stories have Point value higher than
+        # totalPointsAchievable input.
+        storylist = self._getFakeStoryList1()
+        datastore_mock = Mock()
+        datastore_mock.__class__ = IDatastore
+        datastore_mock.readStory.return_value = storylist
+        backlog = IBacklog(datastore_mock)
+        actual_storylist = backlog.getSprint(10)
+ 
+    def test_getSprintNormal1(self):
+        # Make sure IBacklog.getSprint returns the maximum stories for totalPointsAchievable input.
+        # Lower Priority number is more important.
+        # Maximize lower Priority first, than higher Priorities.
+        storylist = self._getFakeStoryList1()
+        datastore_mock = Mock()
+        datastore_mock.__class__ = IDatastore
+        datastore_mock.readStory.return_value = storylist
+        backlog = IBacklog(datastore_mock)
+        actual_storylist = backlog.getSprint(10)
+        self.assertIn(self.story1, actual_storylist)
+        self.assertIn(self.story3, actual_storylist)
+        self.assertIn(self.story6, actual_storylist)
 
-    def _setStoryTableStateWithSQLFile(self, filename):
-        # Sets the state of the Story table with an sql script file.
-        try:
-            f = open(filename, 'r')
-        except (IOError, e):
-            print("Couldn't open " + filename)
-        conn = sqlite3.connect(TEST_SQLITE_DB_FILENAME)
-        with conn:
-            cur = conn.cursor()
-            cur.execute('''DROP TABLE IF EXISTS Stories''')
-            cur.executescript(f.read())
-            conn.commit()
-            f.close()
 
 if __name__ == '__main__':
     unittest.main()
